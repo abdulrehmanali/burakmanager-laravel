@@ -53,6 +53,7 @@ class LedgerController extends Controller
     $ledger->bank_name = request('bank_name');
     $ledger->transaction_id = request('transaction_id');
     $ledger->cheque_number = request('cheque_number');
+    $ledger->created_at = request('created_at');
     if(!$ledger->save()){
       return response()->json(['error'=>'Unable to save ledger please try again.'], Response::HTTP_BAD_REQUEST);
     }
@@ -130,6 +131,20 @@ class LedgerController extends Controller
       return response()->json(['error'=>'Unable to find ledger.'], Response::HTTP_BAD_REQUEST);
     }
     return response()->json(['entry'=>$ledger,'products'=>$ledger->products]);
+  }
+
+  public function delete() {
+    $user = $this->getUser(request());
+    if(!$user){
+      return response()->json(['error'=>'Please Login'], Response::HTTP_BAD_REQUEST);
+    }
+
+    $ledger = Ledger::where('id',request('ledger_id'))->where('shop_id',request('shop_id'));
+    if(!$ledger->delete()){
+      LedgerProducts::where('ledger_id',request('ledger_id'))->delete();
+      return response()->json(['error'=>'Unable to delete ledger.'], Response::HTTP_BAD_REQUEST);
+    }
+    return response()->json(['success'=>true]);
   }
 
   public function viewPdf() {

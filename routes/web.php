@@ -49,6 +49,7 @@ Route::get('/shops/{shop_id}/ledger/{ledger_id}/recipt', 'LedgerController@viewP
   Route::get('/shops/{shop_id}/ledger', 'LedgerController@index');
   Route::post('/shops/{shop_id}/ledger', 'LedgerController@create');
   Route::get('/shops/{shop_id}/ledger/{ledger_id}', 'LedgerController@view');
+  Route::delete('/shops/{shop_id}/ledger/{ledger_id}', 'LedgerController@delete');
   
   Route::post('/shops/{shop_id}/ledger/{ledger_id}', 'LedgerController@update');
 
