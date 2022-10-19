@@ -15,6 +15,6 @@ class ProductionProducts extends Model
     'sku',
   ];
   public function products() {
-    return $this->hasMany(ProductionProductsProducts::class,'id','production_product_id');
+    return $this->hasMany(ProductionProductsProducts::class,'production_product_id','id');
   }
 }

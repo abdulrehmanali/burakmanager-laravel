@@ -15,6 +15,6 @@ class ProductionProductsProducts extends Model
     'one_product_quantity',
   ];
   public function product() {
-    return $this->hasOne(Products::class,'production_product_id','id');
+    return $this->hasOne(Products::class,'id','product_id');
   }
 }

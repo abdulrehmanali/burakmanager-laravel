@@ -19,6 +19,7 @@ class ShopsController extends Controller
     $shops = $user->shops()->orderBy('created_at','desc')->get();
     foreach ($shops as $key => $shop) {
       $shops[$key]['shop'] = $shop->shop;
+      $shops[$key]['shop']['users'] = $shop->shop->users;
     }
     return response()->json(['shops'=>$shops]);
   }
@@ -29,7 +30,7 @@ class ShopsController extends Controller
     if(!$user){
       return response()->json(['error'=>'Please Login'], Response::HTTP_BAD_REQUEST);
     }
-    $shop = $user->shops()->where('shop_id',request('id'))->first();
+    $shop = $user->shops()->where('shop_id',request('shop_id'))->first();
     if(!$shop){
       return response()->json(['error'=>'Shop not found'], Response::HTTP_BAD_REQUEST);
     }

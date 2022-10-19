@@ -28,8 +28,8 @@ Route::get('/shops/{shop_id}/ledger/{ledger_id}/recipt', 'LedgerController@viewP
 
   Route::get('/shops', 'ShopsController@index');
   Route::post('/shops', 'ShopsController@create');
-  Route::get('/shops/{id}', 'ShopsController@view');
-  Route::delete('/shops/{id}/users/{user_id}', 'ShopsController@delete_user');
+  Route::get('/shops/{shop_id}', 'ShopsController@view');
+  Route::delete('/shops/{shop_id}/users/{user_id}', 'ShopsController@delete_user');
 
   Route::get('/shops/{shop_id}/products', 'ProductsController@index');
   Route::post('/shops/{shop_id}/products', 'ProductsController@create');
@@ -38,6 +38,7 @@ Route::get('/shops/{shop_id}/ledger/{ledger_id}/recipt', 'LedgerController@viewP
 
   Route::get('/shops/{shop_id}/produciton-products', 'ProductionProductsController@index');
   Route::post('/shops/{shop_id}/produciton-products', 'ProductionProductsController@create');
+  Route::get('/shops/{shop_id}/produciton-products/{id}.pdf', 'ProductionProductsController@viewPdf');
   Route::get('/shops/{shop_id}/produciton-products/{id}', 'ProductionProductsController@view');
   Route::post('/shops/{shop_id}/produciton-products/{id}', 'ProductionProductsController@update');
 

@@ -14,6 +14,10 @@ class CustomersController extends Controller
     if(!$user){
       return response()->json(['error'=>'Please Login'], Response::HTTP_BAD_REQUEST);
     }
+    $shop = $user->shops()->where('shop_id',request('shop_id'))->first();
+    if(!$shop){
+      return response()->json(['error'=>'Shop not found'], Response::HTTP_BAD_REQUEST);
+    }
     $validated = Validator::make(request()->all(), [
       'name' => 'required|max:255',
       'email' => 'nullable|email',
@@ -44,6 +48,10 @@ class CustomersController extends Controller
     $user = $this->getUser(request());
     if(!$user){
       return response()->json(['error'=>'Please Login'], Response::HTTP_BAD_REQUEST);
+    }
+    $shop = $user->shops()->where('shop_id',request('shop_id'))->first();
+    if(!$shop){
+      return response()->json(['error'=>'Shop not found'], Response::HTTP_BAD_REQUEST);
     }
     $validated = Validator::make(request()->all(), [
       'name' => 'name|max:255',
@@ -76,6 +84,10 @@ class CustomersController extends Controller
     if(!$user){
       return response()->json(['error'=>'Please Login'], Response::HTTP_BAD_REQUEST);
     }
+    $shop = $user->shops()->where('shop_id',request('shop_id'))->first();
+    if(!$shop){
+      return response()->json(['error'=>'Shop not found'], Response::HTTP_BAD_REQUEST);
+    }
 
     $customer = Customers::where('id',request('customer_id'))->where('shop_id',request('shop_id'))->get()->first();
     if(!$customer){
@@ -88,6 +100,10 @@ class CustomersController extends Controller
     $user = $this->getUser(request());
     if(!$user){
       return response()->json(['error'=>'Please Login'], Response::HTTP_BAD_REQUEST);
+    }
+    $shop = $user->shops()->where('shop_id',request('shop_id'))->first();
+    if(!$shop){
+      return response()->json(['error'=>'Shop not found'], Response::HTTP_BAD_REQUEST);
     }
     $customer = Customers::where("shop_id",request("shop_id"));
     if(request('search') && !empty(request('search'))){

@@ -19,6 +19,10 @@ class LedgerController extends Controller
     if(!$user){
       return response()->json(['error'=>'Please Login'], Response::HTTP_BAD_REQUEST);
     }
+    $shop = $user->shops()->where('shop_id',request('shop_id'))->first();
+    if(!$shop){
+      return response()->json(['error'=>'Shop not found'], Response::HTTP_BAD_REQUEST);
+    }
     $validation_args = [
       'type' => 'required',
       'payment_method' => 'required',
@@ -89,6 +93,10 @@ class LedgerController extends Controller
     if(!$user){
       return response()->json(['error'=>'Please Login'], Response::HTTP_BAD_REQUEST);
     }
+    $shop = $user->shops()->where('shop_id',request('shop_id'))->first();
+    if(!$shop){
+      return response()->json(['error'=>'Shop not found'], Response::HTTP_BAD_REQUEST);
+    }
     $validation_args = [
       'type' => 'required',
       'payment_method' => 'required',
@@ -102,7 +110,7 @@ class LedgerController extends Controller
     if ($validated->fails()) {
       return response()->json(['errors'=>$validated->messages()], Response::HTTP_BAD_REQUEST);
     }
-    $ledger = new Ledger(request('id'));
+    $ledger = Ledger::find(request('ledger_id'));
     $ledger->shop_id = request('shop_id');
     $ledger->type = request('type');
     $ledger->payment_method = request('payment_method');
@@ -125,6 +133,10 @@ class LedgerController extends Controller
     if(!$user){
       return response()->json(['error'=>'Please Login'], Response::HTTP_BAD_REQUEST);
     }
+    $shop = $user->shops()->where('shop_id',request('shop_id'))->first();
+    if(!$shop){
+      return response()->json(['error'=>'Shop not found'], Response::HTTP_BAD_REQUEST);
+    }
 
     $ledger = Ledger::where('id',request('ledger_id'))->where('shop_id',request('shop_id'))->get()->first();
     if(!$ledger){
@@ -137,6 +149,10 @@ class LedgerController extends Controller
     $user = $this->getUser(request());
     if(!$user){
       return response()->json(['error'=>'Please Login'], Response::HTTP_BAD_REQUEST);
+    }
+    $shop = $user->shops()->where('shop_id',request('shop_id'))->first();
+    if(!$shop){
+      return response()->json(['error'=>'Shop not found'], Response::HTTP_BAD_REQUEST);
     }
 
     $ledger = Ledger::where('id',request('ledger_id'))->where('shop_id',request('shop_id'));
@@ -170,6 +186,10 @@ class LedgerController extends Controller
     $user = $this->getUser(request());
     if(!$user){
       return response()->json(['error'=>'Please Login'], Response::HTTP_BAD_REQUEST);
+    }
+    $shop = $user->shops()->where('shop_id',request('shop_id'))->first();
+    if(!$shop){
+      return response()->json(['error'=>'Shop not found'], Response::HTTP_BAD_REQUEST);
     }
     $ledgers = Ledger::where("shop_id",request("shop_id"));
     $ledgers = $ledgers->orderBy('created_at','desc')->get();

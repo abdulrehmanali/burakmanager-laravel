@@ -16,6 +16,11 @@ class ProductsBatches extends Model
       'quantity',
       'measurement_unit',
       'expire_at',
-      'status'
+      'status',
+      'delivery_at',
+      'purchase_from_id'
     ];
+    public function purchase_from() {
+      return $this->hasOne(Customers::class,'id', 'purchase_from_id');
+    }
 }
