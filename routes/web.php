@@ -18,6 +18,7 @@ use App\Http\Middleware\Authenticaiton;
 Route::post('/signup', 'AuthenticationController@signup');
 Route::post('/login', 'AuthenticationController@login');
 Route::get('/shops/{shop_id}/ledger/{ledger_id}/recipt', 'LedgerController@viewPdf');
+Route::get('/admin_script/ledger/move_existing_recivings_in_new', 'LedgerController@move_existing_recivings_in_new');
 
 // Route::group([Authenticaiton::class], function()
 // {
@@ -38,9 +39,11 @@ Route::get('/shops/{shop_id}/ledger/{ledger_id}/recipt', 'LedgerController@viewP
 
   Route::get('/shops/{shop_id}/produciton-products', 'ProductionProductsController@index');
   Route::post('/shops/{shop_id}/produciton-products', 'ProductionProductsController@create');
+  Route::post('/shops/{shop_id}/produciton-products/{id}/create-product', 'ProductionProductsController@createProduct');
   Route::get('/shops/{shop_id}/produciton-products/{id}.pdf', 'ProductionProductsController@viewPdf');
   Route::get('/shops/{shop_id}/produciton-products/{id}', 'ProductionProductsController@view');
   Route::post('/shops/{shop_id}/produciton-products/{id}', 'ProductionProductsController@update');
+
 
   Route::get('/shops/{shop_id}/customers', 'CustomersController@index');
   Route::post('/shops/{shop_id}/customers', 'CustomersController@create');

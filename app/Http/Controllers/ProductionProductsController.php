@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Validator;
 use App;
+use App\Models\Products;
+use App\Models\ProductsBatches;
 
 class ProductionProductsController extends Controller
 {
@@ -56,6 +58,102 @@ class ProductionProductsController extends Controller
       Log::error($e);
       DB::rollback();
     }
+    return response()->json($response);
+  }
+
+  function divideFloat($a, $b, $precision=3) {
+    $a*=pow(10, $precision);
+    $result=(int)($a / $b);
+    if (strlen($result)==$precision) return '0.' . $result;
+    else return preg_replace('/(\d{' . $precision . '})$/', '.\1', $result);
+}
+
+  public function createProduct()
+  {
+    $user = $this->getUser(request());
+    if (!$user) {
+      return response()->json(['error' => 'Please Login'], Response::HTTP_BAD_REQUEST);
+    }
+    $shop = $user->shops()->where('shop_id', request('shop_id'))->first();
+    if (!$shop) {
+      return response()->json(['error' => 'Shop not found'], Response::HTTP_BAD_REQUEST);
+    }
+
+    $productionProduct = ProductionProducts::where('id', request('id'))->get()->first();
+    if (!$productionProduct) {
+      return response()->json(['error' => 'Unable to find Production Product'], Response::HTTP_BAD_REQUEST);
+    }
+
+    $response = ['success' => false];
+    $product_price = $productionProduct->price;
+    $product_sku = $productionProduct->sku;
+    $requireQuantity = request('quantity');
+  
+    $batches = [
+      'purchased_at' => date("Y-m-d H:i:s"),
+      'purchasing_price' => $product_price,
+      'selling_price' => $product_price,
+      'quantity' => $requireQuantity,
+      'measurement_unit' => 'piece',
+      'status' => 'in-production',
+    ];
+
+      try {
+        DB::beginTransaction();
+        $existing_product = Products::where('sku', $product_sku)->get()->first();
+        if ($existing_product) {
+          $batches['product_id'] = $existing_product->id;
+        } else {
+          $product = new Products();
+          $product->shop_id = request('shop_id');
+          $product->name = $productionProduct->name;
+          $product->sku = $product_sku;
+          if (!$product->save()) {
+            $response['error'] = 'Unable to save product please try again.';
+            throw new \Exception("Unable to save product please try again");
+            return $response;
+          }
+          $batches['product_id'] = $product->id;
+        }
+        ProductsBatches::create($batches);
+        foreach ($productionProduct->products as $productionProductProduct) {
+          $batches_query = $productionProductProduct->product->batches()->where('status', 'active');
+          $productionProductProductsBatches = $batches_query->get();
+          // $totalQuantity = 0;
+          // foreach ($productionProductProductsBatches as $productionProductProductsBatch) {
+          //   $totalQuantity += $productionProductProductsBatch->quantity;
+          // }
+          
+          $maxGenerationQuantity = $productionProductProduct->one_product_quantity * $requireQuantity;
+          Log::error('maxGenerationQuantity > '.$maxGenerationQuantity);
+
+          foreach ($productionProductProductsBatches as $productionProductProductsBatch) {
+            Log::error('maxGenerationQuantity > '.$maxGenerationQuantity);
+            $newQuantity = 0;
+            if ($productionProductProductsBatch->quantity >= $maxGenerationQuantity) {
+              $newQuantity = $productionProductProductsBatch->quantity - $maxGenerationQuantity;
+            }else if ($productionProductProductsBatch->quantity <= $maxGenerationQuantity) {
+              $newQuantity = $maxGenerationQuantity -  $productionProductProductsBatch->quantity;
+            }
+            Log::error('newQuantity > '.$newQuantity);
+            $maxGenerationQuantity = ($maxGenerationQuantity > $newQuantity?$maxGenerationQuantity - $newQuantity:$newQuantity - $maxGenerationQuantity);
+            $new_update = ['quantity'=>$newQuantity];
+            if ($newQuantity == 0) {
+              $new_update['status'] = "out-of-stock";
+            }
+            $batches_query->where('id', $productionProductProductsBatch->id)->update($new_update);
+
+            if ($maxGenerationQuantity == 0){
+              break;
+            }
+          }
+        }
+        $response['success'] = true;
+        DB::commit();
+      } catch (\Exception $e) {
+        Log::error($e);
+        DB::rollback();
+      }
     return response()->json($response);
   }
 

@@ -28,4 +28,7 @@ class Ledger extends Model
   public function customer() {
     return $this->hasOne(Customers::class,'id','customer_id');
   }
+  public function payments() {
+    return $this->hasMany(LedgerPayments::class,'ledger_id','id');
+  }
 }

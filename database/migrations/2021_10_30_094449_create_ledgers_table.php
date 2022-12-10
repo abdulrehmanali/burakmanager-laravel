@@ -17,15 +17,9 @@ class CreateLedgersTable extends Migration
         $table->id();
         $table->integer('shop_id');
         $table->string('type');
-        $table->string('payment_method');
-        $table->string('payment_status');
-        $table->decimal('amount_received');
         $table->decimal('total');
         $table->integer('customer_id');
         $table->text('note')->nullable();
-        $table->string('bank_name')->nullable();
-        $table->string('transaction_id')->nullable();
-        $table->string('cheque_number')->nullable();
         $table->timestamps();
       });
     }

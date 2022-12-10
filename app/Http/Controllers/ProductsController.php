@@ -29,7 +29,10 @@ class ProductsController extends Controller
       'batches.*.purchasing_price' => 'required',
       'batches.*.selling_price' => 'required',
       'batches.*.quantity' => 'required',
-      'batches.*.measurement_unit' => 'required'
+      'batches.*.measurement_unit' => 'required',
+      'batches.*.purchase_from' => 'nullable',
+      'batches.*.expire_at' => 'nullable',
+      'batches.*.status' => 'required',
     ]);
     if ($validated->fails()) {
       return response()->json(['errors' => $validated->messages()], Response::HTTP_BAD_REQUEST);
@@ -46,16 +49,28 @@ class ProductsController extends Controller
       }
       $batches = request('batches');
       foreach ($batches as $key => $value) {
+        $batches[$key]['created_at'] = date("Y-m-d H:i:s");
+        $batches[$key]['updated_at'] = date("Y-m-d H:i:s");
         $batches[$key]['purchase_from_id'] = null;
         $batches[$key]['product_id'] = $product->id;
         if (!isset($batches[$key]['status']) && empty($batches[$key]['status'])) {
           $batches[$key]['status'] = 'on-hold';
         }
-        if (isset($value['purchase_from']))
+        if (isset($value['purchase_from'])){
           if (isset($value['purchase_from']['id']) && !empty($value['purchase_from']['id'])) {
             $batches[$key]['purchase_from_id'] = $value['purchase_from']['id'];
           }
         unset($batches[$key]['purchase_from']);
+        }
+        if (isset($value['purchased_at'])) {
+          $batches[$key]['purchased_at'] = date("Y-m-d H:i:s", strtotime($batches[$key]['purchased_at']));
+        }
+        if (isset($value['expire_at'])) {
+          $batches[$key]['expire_at'] = date("Y-m-d H:i:s", strtotime($batches[$key]['expire_at']));
+        }
+        if (isset($value['delivery_at'])) {
+          $batches[$key]['delivery_at'] = date("Y-m-d H:i:s", strtotime($batches[$key]['delivery_at']));
+        }
       }
       ProductsBatches::insert($batches);
       DB::commit();
@@ -88,7 +103,10 @@ class ProductsController extends Controller
       'batches.*.purchasing_price' => 'required',
       'batches.*.selling_price' => 'required',
       'batches.*.quantity' => 'required',
-      'batches.*.measurement_unit' => 'required'
+      'batches.*.measurement_unit' => 'required',
+      'batches.*.purchase_from' => 'nullable',
+      'batches.*.expire_at' => 'nullable',
+      'batches.*.status' => 'required',
     ]);
     if ($validated->fails()) {
       return response()->json(['errors' => $validated->messages()], Response::HTTP_BAD_REQUEST);
@@ -103,28 +121,41 @@ class ProductsController extends Controller
       if (!$update) {
         return response()->json(['error' => 'Unable to update product please try again.'], Response::HTTP_BAD_REQUEST);
       }
-      $batches = request('batches');
+      $batches = $validated->valid()['batches'];
       ProductsBatches::where('product_id', request('id'))->delete();
       foreach ($batches as $key => $value) {
-        $batches[$key]['purchase_from_id'] = null;
-        $batches[$key]['product_id'] = request('id');
-        if (isset($batches[$key]['batch_id'])) {
-          unset($batches[$key]['batch_id']);
+        if (empty($batches[$key]['created_at'])) {
+          $batches[$key]['created_at'] = date("Y-m-d H:i:s");
         }
-        if (!isset($batches[$key]['status']) || empty($batches[$key]['status'])) {
+        $batches[$key]['updated_at'] = date("Y-m-d H:i:s");
+        $batches[$key]['purchase_from_id'] = null;
+        $batches[$key]['product_id'] = (int) request('id');
+        if (!isset($batches[$key]['status']) && empty($batches[$key]['status'])) {
           $batches[$key]['status'] = 'on-hold';
         }
-        if (isset($value['purchase_from']))
+        if (isset($value['purchase_from'])) {
           if (isset($value['purchase_from']['id']) && !empty($value['purchase_from']['id'])) {
             $batches[$key]['purchase_from_id'] = $value['purchase_from']['id'];
           }
-        unset($batches[$key]['purchase_from']);
+          unset($batches[$key]['purchase_from']);
+        }
+        if (isset($value['purchased_at'])) {
+          $batches[$key]['purchased_at'] = date("Y-m-d H:i:s", strtotime($batches[$key]['purchased_at']));
+        }
+        if (isset($value['expire_at'])) {
+          $batches[$key]['expire_at'] = date("Y-m-d H:i:s", strtotime($batches[$key]['expire_at']));
+        }
+        if (isset($value['delivery_at'])) {
+          $batches[$key]['delivery_at'] = date("Y-m-d H:i:s", strtotime($batches[$key]['delivery_at']));
+        }
+        ProductsBatches::create($batches[$key]);
+
       }
-      ProductsBatches::insert($batches);
       DB::commit();
       $response['success'] = true;
     } catch (\Exception $e) {
       Log::error($e);
+      $response['message'] = $e;
       DB::rollback();
     }
     return response()->json($response);
@@ -140,7 +171,7 @@ class ProductsController extends Controller
     if (!$shop) {
       return response()->json(['error' => 'Shop not found'], Response::HTTP_BAD_REQUEST);
     }
-    $product = Products::where("id", request("id"))->where('shop_id', request('shop_id'))->get()->first();
+    $product = Products::where("id", request("id"))->where('shop_id', request('shop_id'))->with('batches')->get()->first();
     if (!$product) {
       return response()->json(['error' => 'Unable to find product.'], Response::HTTP_BAD_REQUEST);
     }
@@ -149,19 +180,21 @@ class ProductsController extends Controller
       $product['batches'][$i]['purchase_from'] = $product->batches[$i]->purchase_from;
     }
     $productionProducts = [];
-    $productionProducts = ProductionProducts::where('shop_id', request('shop_id'))->where('sku', $product->sku)->get()->first();
-    if ($productionProducts) {
-      foreach ($productionProducts->products as $productionProducts_product) {
+    $productionProductsQuery = ProductionProducts::where('shop_id', request('shop_id'))->where('sku', $product->sku)->get()->first();
+    if ($productionProductsQuery) {
+      foreach ($productionProductsQuery->products as $productionProducts_product) {
         $quantity = 0;
+        $measurement_unit = '';
         foreach ($productionProducts_product->product->batches as $value) {
           $quantity += $value->quantity;
+          $measurement_unit = $value->measurement_unit;
         }
         $productionProducts[] = [
           'id' => $productionProducts_product->product->id,
           'name' => $productionProducts_product->product->name,
           'sku' => $productionProducts_product->product->sku,
-          'measurement_unit' => $productionProducts_product->product->measurement_unit,
-          'one_product_quantity' => $productionProducts_product->product->one_product_quantity,
+          'one_product_quantity' => $productionProducts_product->one_product_quantity,
+          'measurement_unit'=> $measurement_unit,
           'quantity' => $quantity
         ];
       }
