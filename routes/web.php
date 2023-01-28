@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Middleware\Authenticaiton;
+use App\Http\Middleware\Authentication;
 
 /*
 |--------------------------------------------------------------------------
@@ -17,15 +17,15 @@ use App\Http\Middleware\Authenticaiton;
 
 Route::post('/signup', 'AuthenticationController@signup');
 Route::post('/login', 'AuthenticationController@login');
-Route::get('/shops/{shop_id}/ledger/{ledger_id}/recipt', 'LedgerController@viewPdf');
-Route::get('/admin_script/ledger/move_existing_recivings_in_new', 'LedgerController@move_existing_recivings_in_new');
+Route::get('/shops/{shop_id}/ledger/{ledger_id}/receipt', 'LedgerController@viewPdf');
+// Route::get('/admin_script/ledger/move_existing_receiving_in_new', 'LedgerController@move_existing_receiving_in_new');
 
-// Route::group([Authenticaiton::class], function()
+// Route::group([Authentication::class], function()
 // {
   Route::get('/home', 'HomeController@index');
   Route::get('/home/{shop_id}', 'HomeController@index');
 
-  Route::get('/invitaions/accept/{id}', 'InvitationsController@accept');
+  Route::get('/invitations/accept/{id}', 'InvitationsController@accept');
 
   Route::get('/shops', 'ShopsController@index');
   Route::post('/shops', 'ShopsController@create');
@@ -37,12 +37,12 @@ Route::get('/admin_script/ledger/move_existing_recivings_in_new', 'LedgerControl
   Route::get('/shops/{shop_id}/products/{id}', 'ProductsController@view');
   Route::post('/shops/{shop_id}/products/{id}', 'ProductsController@update');
 
-  Route::get('/shops/{shop_id}/produciton-products', 'ProductionProductsController@index');
-  Route::post('/shops/{shop_id}/produciton-products', 'ProductionProductsController@create');
-  Route::post('/shops/{shop_id}/produciton-products/{id}/create-product', 'ProductionProductsController@createProduct');
-  Route::get('/shops/{shop_id}/produciton-products/{id}.pdf', 'ProductionProductsController@viewPdf');
-  Route::get('/shops/{shop_id}/produciton-products/{id}', 'ProductionProductsController@view');
-  Route::post('/shops/{shop_id}/produciton-products/{id}', 'ProductionProductsController@update');
+  Route::get('/shops/{shop_id}/production-products', 'ProductionProductsController@index');
+  Route::post('/shops/{shop_id}/production-products', 'ProductionProductsController@create');
+  Route::post('/shops/{shop_id}/production-products/{id}/create-product', 'ProductionProductsController@createProduct');
+  Route::get('/shops/{shop_id}/production-products/{id}.pdf', 'ProductionProductsController@viewPdf');
+  Route::get('/shops/{shop_id}/production-products/{id}', 'ProductionProductsController@view');
+  Route::post('/shops/{shop_id}/production-products/{id}', 'ProductionProductsController@update');
 
 
   Route::get('/shops/{shop_id}/customers', 'CustomersController@index');
@@ -52,11 +52,19 @@ Route::get('/admin_script/ledger/move_existing_recivings_in_new', 'LedgerControl
 
   Route::get('/shops/{shop_id}/ledger', 'LedgerController@index');
   Route::post('/shops/{shop_id}/ledger', 'LedgerController@create');
+  Route::post('/shops/{shop_id}/ledger/{ledger_id}/delete-receiving/{receiving_id}', 'LedgerController@delete_receiving');
   Route::get('/shops/{shop_id}/ledger/{ledger_id}', 'LedgerController@view');
   Route::delete('/shops/{shop_id}/ledger/{ledger_id}', 'LedgerController@delete');
-  
   Route::post('/shops/{shop_id}/ledger/{ledger_id}', 'LedgerController@update');
 
   Route::post('/shops/{shop_id}/invitations/', 'InvitationsController@create');
-  Route::delete('/shops/{shop_id}/invitaions/{invitation_id}', 'InvitationsController@delete');
+  Route::delete('/shops/{shop_id}/invitations/{invitation_id}', 'InvitationsController@delete');
+
+  Route::get('/shops/{shop_id}/receiving', 'ReceivingsController@index');
+  Route::post('/shops/{shop_id}/receiving', 'ReceivingsController@create');
+  Route::post('/shops/{shop_id}/receiving/{receiving_id}/deduct', 'ReceivingsController@batchDeduct');
+  Route::get('/shops/{shop_id}/receiving/{receiving_id}', 'ReceivingsController@view');
+  Route::post('/shops/{shop_id}/receiving/{receiving_id}', 'ReceivingsController@update');
+  Route::delete('/shops/{shop_id}/receiving/{receiving_id}', 'ReceivingsController@delete');
+
 // });
