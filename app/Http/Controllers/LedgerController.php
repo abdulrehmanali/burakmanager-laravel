@@ -28,14 +28,16 @@ class LedgerController extends Controller
     }
     $validation_args = [
       'type' => 'required',
-      'customer_name' => 'required',
-      'payments.*.method' => 'required',
-      'payments.*.status' => 'required',
-      'payments.*.amount' => 'required',
-      'payments.*.bank_name' => 'required_if:payments.method,bankTransfer',
-      'payments.*.transaction_id' => 'required_if:payments.method,bankTransfer',
-      'payments.*.cheque_number' => 'required_if:payments.method,cheque',
+      'customer_name' => 'required'
     ];
+    if (request('payments')) {
+      $validation_args["payments.*.method"] = "required";
+      $validation_args["payments.*.status"] = "required";
+      $validation_args["payments.*.amount"] = "required";
+      $validation_args["payments.*.bank_name"] = "required_if:payments.method,bankTransfer";
+      $validation_args["payments.*.transaction_id"] = "required_if:payments.method,bankTransfer";
+      $validation_args["payments.*.cheque_number"] = "required_if:payments.method,cheque";
+    }
     if (request('products')) {
       $validation_args["total"] = "required";
       $validation_args["products.*.product_name"] = "required";
@@ -63,18 +65,20 @@ class LedgerController extends Controller
       $ledger->note = request('note');
       $ledger->save();
 
-      $payments = $validated->validated()['payments'];
-      foreach ($payments as $key => $payment) {
-        $ledgerPayments = new LedgerPayments();
-        $ledgerPayments->shop_id = request('shop_id');
-        $ledgerPayments->ledger_id = $ledger->id;
-        $ledgerPayments->method = $payment['method'];
-        $ledgerPayments->status = $payment['status'];
-        $ledgerPayments->amount = $payment['amount'];
-        $ledgerPayments->bank_name = $payment['bank_name'];
-        $ledgerPayments->transaction_id = $payment['transaction_id'];
-        $ledgerPayments->cheque_number = $payment['cheque_number'];
-        $ledgerPayments->save();
+      if (request('payments')) {
+        $payments = $validated->validated()['payments'];
+        foreach ($payments as $key => $payment) {
+          $ledgerPayments = new LedgerPayments();
+          $ledgerPayments->shop_id = request('shop_id');
+          $ledgerPayments->ledger_id = $ledger->id;
+          $ledgerPayments->method = $payment['method'];
+          $ledgerPayments->status = $payment['status'];
+          $ledgerPayments->amount = $payment['amount'];
+          $ledgerPayments->bank_name = $payment['bank_name'];
+          $ledgerPayments->transaction_id = $payment['transaction_id'];
+          $ledgerPayments->cheque_number = $payment['cheque_number'];
+          $ledgerPayments->save();
+        }
       }
       if (request('products')) {
         $products = $validated->validated()['products'];
@@ -99,10 +103,10 @@ class LedgerController extends Controller
     if (request('pdf')) {
       $shop = Shops::where('id', request('shop_id'))->get()->first();
       if (request('html')) {
-        return view('pdf.new_order_recipt', ['shop' => $shop, 'entry' => $ledger, 'products' => $products]);
+        return view('pdf.new_order_receipt', ['shop' => $shop, 'entry' => $ledger, 'products' => $products]);
       }
       $pdf = App::make('dompdf.wrapper');
-      $pdf->loadHTML(view('pdf.new_order_recipt', ['shop' => $shop, 'entry' => $ledger, 'products' => $products]));
+      $pdf->loadHTML(view('pdf.new_order_receipt', ['shop' => $shop, 'entry' => $ledger, 'products' => $products]));
       return $pdf->stream();
     }
     return response()->json($response);
@@ -142,23 +146,23 @@ class LedgerController extends Controller
       $ledger->type = request('type');
       $ledger->customer_name = request('customer_name');
       $ledger->customer_id = request('customer_id');
-      $ledger->total = request('total');
+      // $ledger->total = request('total');
       $ledger->note = request('note');
       $ledger->save();
-      $ledger->payments()->delete();
-      $payments = $validated->validated()['payments'];
-      foreach ($payments as $payment) {
-        $ledgerPayments = new LedgerPayments();
-        $ledgerPayments->shop_id = request('shop_id');
-        $ledgerPayments->ledger_id = $ledger->id;
-        $ledgerPayments->method = $payment['method'];
-        $ledgerPayments->status = $payment['status'];
-        $ledgerPayments->amount = $payment['amount'];
-        $ledgerPayments->bank_name = $payment['bank_name'];
-        $ledgerPayments->transaction_id = $payment['transaction_id'];
-        $ledgerPayments->cheque_number = $payment['cheque_number'];
-        $ledgerPayments->save();
-      }
+      // $ledger->payments()->delete();
+      // $payments = $validated->validated()['payments'];
+      // foreach ($payments as $payment) {
+      //   $ledgerPayments = new LedgerPayments();
+      //   $ledgerPayments->shop_id = request('shop_id');
+      //   $ledgerPayments->ledger_id = $ledger->id;
+      //   $ledgerPayments->method = $payment['method'];
+      //   $ledgerPayments->status = $payment['status'];
+      //   $ledgerPayments->amount = $payment['amount'];
+      //   $ledgerPayments->bank_name = $payment['bank_name'];
+      //   $ledgerPayments->transaction_id = $payment['transaction_id'];
+      //   $ledgerPayments->cheque_number = $payment['cheque_number'];
+      //   $ledgerPayments->save();
+      // }
       DB::commit();
       $response['success'] = true;
       $response['id'] = $ledger->id;
@@ -184,11 +188,6 @@ class LedgerController extends Controller
     $ledger = Ledger::where('id', request('ledger_id'))->where('shop_id', request('shop_id'))->with('customer')->with('products')->with('payments')->get()->first();
     if (!$ledger) {
       return response()->json(['error' => 'Unable to find ledger.'], Response::HTTP_BAD_REQUEST);
-    }
-
-    $ledger['amount_received'] = 0.00;
-    foreach ($ledger->payments() as $receiving) {
-      $ledger['amount_received'] += (float)$receiving->amount;
     }
     return response()->json(['entry' => $ledger, 'products' => $ledger->products]);
   }
@@ -226,10 +225,10 @@ class LedgerController extends Controller
     }
     $shop = Shops::where('id', request('shop_id'))->get()->first();
     if (request('html')) {
-      return view('pdf.recipt', ['shop' => $shop, 'entry' => $ledger, 'products' => $ledger->products]);
+      return view('pdf.receipt', ['shop' => $shop, 'entry' => $ledger, 'products' => $ledger->products]);
     }
     $pdf = App::make('dompdf.wrapper');
-    $pdf->loadHTML(view('pdf.recipt', ['shop' => $shop, 'entry' => $ledger, 'products' => $ledger->products]));
+    $pdf->loadHTML(view('pdf.receipt', ['shop' => $shop, 'entry' => $ledger, 'products' => $ledger->products]));
     return $pdf->stream();
   }
 
@@ -260,12 +259,6 @@ class LedgerController extends Controller
       $ledgers->where("payment_status", $_GET['paymentStatus']);
     }
     $ledgers = $ledgers->orderBy('created_at', 'desc')->get();
-    foreach ($ledgers as $key => $ledger) {
-      $ledgers[$key]['amount_received'] = 0.00;
-      foreach ($ledger->payments as $payment) {
-        $ledgers[$key]['amount_received'] += (float)$payment->amount;
-      }
-    }
     if (isset($_GET['print']) && $_GET['print'] == 'false') {
       return response()->json(['entries' => $ledgers]);
     }
@@ -274,7 +267,7 @@ class LedgerController extends Controller
     return $pdf->stream();
   }
 
-  public function move_existing_recivings_in_new()
+  public function move_existing_receiving_in_new()
   {
     $ledgers = Ledger::get();
     LedgerPayments::truncate();
@@ -296,5 +289,10 @@ class LedgerController extends Controller
       }
     }
     return $result;
+  }
+
+  public function delete_receiving() {
+    LedgerPayments::where('id', request('receiving_id'))->where('ledger_id', request('ledger_id'))->where('shop_id', request('shop_id'))->delete();
+    return response()->json(['success' => true]);
   }
 }
