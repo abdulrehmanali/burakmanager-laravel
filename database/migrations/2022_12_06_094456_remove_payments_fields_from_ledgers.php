@@ -13,14 +13,16 @@ class RemovePaymentsFieldsFromLedgers extends Migration
      */
     public function up()
     {
-      Schema::table('ledgers', function (Blueprint $table) {
-        $table->dropColumn('payment_method');
-        $table->dropColumn('payment_status');
-        $table->dropColumn('amount_received');
-        $table->dropColumn('bank_name');
-        $table->dropColumn('transaction_id');
-        $table->dropColumn('cheque_number');
-      });
+      if (Schema::hasColumn('ledgers', 'payment_method')) {
+        Schema::table('ledgers', function (Blueprint $table) {
+          $table->dropColumn('payment_method');
+          $table->dropColumn('payment_status');
+          $table->dropColumn('amount_received');
+          $table->dropColumn('bank_name');
+          $table->dropColumn('transaction_id');
+          $table->dropColumn('cheque_number');
+        });
+      }
     }
 
     /**
