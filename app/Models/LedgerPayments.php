@@ -16,6 +16,11 @@ class LedgerPayments extends Model
     'transaction_id',
     'cheque_number',
     'shop_id',
-    'ledger_id'
+    'ledger_id',
+    'receiving_id'
   ];
+
+  public function ledger() {
+    return $this->hasOne(Ledger::class, 'id', 'ledger_id');
+  }
 }
