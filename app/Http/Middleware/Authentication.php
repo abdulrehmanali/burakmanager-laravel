@@ -8,7 +8,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
-class Authenticaiton
+class Authentication
 {
   /**
    * Handle an incoming request.
