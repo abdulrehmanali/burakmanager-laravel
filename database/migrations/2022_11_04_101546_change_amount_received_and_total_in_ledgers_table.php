@@ -14,7 +14,9 @@ class ChangeAmountReceivedAndTotalInLedgersTable extends Migration
     public function up()
     {
         Schema::table('ledgers', function (Blueprint $table) {
-          $table->decimal('amount_received', 12, 2)->change();
+          if (Schema::hasColumn('ledgers', 'amount_received')){
+            $table->decimal('amount_received', 12, 2)->change();
+          }
           $table->decimal('total', 12, 2)->change();
         });
     }
@@ -26,9 +28,9 @@ class ChangeAmountReceivedAndTotalInLedgersTable extends Migration
      */
     public function down()
     {
-        Schema::table('ledgers', function (Blueprint $table) {
-          $table->decimal('amount_received')->change();
-          $table->decimal('total')->change();
-        });
+        // Schema::table('ledgers', function (Blueprint $table) {
+        //   $table->decimal('amount_received')->change();
+        //   $table->decimal('total')->change();
+        // });
     }
 }

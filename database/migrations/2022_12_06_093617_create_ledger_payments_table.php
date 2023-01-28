@@ -23,6 +23,7 @@ class CreateLedgerPaymentsTable extends Migration
             $table->string('cheque_number')->nullable();
             $table->integer('shop_id');
             $table->integer('ledger_id');
+            $table->integer('receiving_id')->nullable();
             $table->timestamps();
         });
     }

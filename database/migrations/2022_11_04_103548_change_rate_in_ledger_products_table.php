@@ -25,8 +25,8 @@ class ChangeRateInLedgerProductsTable extends Migration
      */
     public function down()
     {
-        Schema::table('ledger_products', function (Blueprint $table) {
-          $table->decimal('rate');
-        });
+        // Schema::table('ledger_products', function (Blueprint $table) {
+        //   $table->decimal('rate')->change();
+        // });
     }
 }
