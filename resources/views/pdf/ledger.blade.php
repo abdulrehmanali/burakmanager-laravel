@@ -33,10 +33,10 @@ $pending = 0;
     </tr>
     @foreach ($entries as $entry)
     @php
-      if ($entry->total > $entry->amount_received) {
-        $pending += $entry->total - $entry->amount_received;
+      if ($entry->total > $entry->amount_received()) {
+        $pending += $entry->total - $entry->amount_received();
       }
-      $total += $entry->amount_received;
+      $total += $entry->amount_received();
     @endphp
     <tr>
       <td>{{$entry->id}}</td>
@@ -45,7 +45,7 @@ $pending = 0;
       <td>{{$entry->type}}</td>
       <td>{{$entry->payment_method}}</td>
       <td>{{number_format($entry->total, 2)}}</td>
-      <td>{{ ($entry->total > $entry->amount_received ? number_format($entry->total - $entry->amount_received, 2) : 0.00)}}</td>
+      <td>{{ ($entry->total > $entry->amount_received() ? number_format($entry->total - $entry->amount_received(), 2) : 0.00)}}</td>
     </tr>
     @endforeach
     <tr>

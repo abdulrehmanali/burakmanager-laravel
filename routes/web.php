@@ -17,7 +17,6 @@ use App\Http\Middleware\Authentication;
 
 Route::post('/signup', 'AuthenticationController@signup');
 Route::post('/login', 'AuthenticationController@login');
-Route::get('/shops/{shop_id}/ledger/{ledger_id}/receipt', 'LedgerController@viewPdf');
 // Route::get('/admin_script/ledger/move_existing_receiving_in_new', 'LedgerController@move_existing_receiving_in_new');
 
 // Route::group([Authentication::class], function()
@@ -52,6 +51,8 @@ Route::get('/shops/{shop_id}/ledger/{ledger_id}/receipt', 'LedgerController@view
 
   Route::get('/shops/{shop_id}/ledger', 'LedgerController@index');
   Route::post('/shops/{shop_id}/ledger', 'LedgerController@create');
+  Route::get('/shops/{shop_id}/ledger/{ledger_id}/invoice', 'LedgerController@viewInvoice');
+  Route::get('/shops/{shop_id}/ledger/{ledger_id}/receipt', 'LedgerController@viewPdf');
   Route::post('/shops/{shop_id}/ledger/{ledger_id}/delete-receiving/{receiving_id}', 'LedgerController@delete_receiving');
   Route::get('/shops/{shop_id}/ledger/{ledger_id}', 'LedgerController@view');
   Route::delete('/shops/{shop_id}/ledger/{ledger_id}', 'LedgerController@delete');

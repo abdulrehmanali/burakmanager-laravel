@@ -203,21 +203,26 @@ class LedgerController extends Controller
       return response()->json(['error' => 'Shop not found'], Response::HTTP_BAD_REQUEST);
     }
 
-    $ledger = Ledger::where('id', request('ledger_id'))->where('shop_id', request('shop_id'));
-    if (!$ledger->delete()) {
+    try {
+      DB::beginTransaction();
+      Ledger::where('id', request('ledger_id'))->where('shop_id', request('shop_id'))->delete();
       LedgerProducts::where('ledger_id', request('ledger_id'))->delete();
-      LedgerPayments::where('ledger_id', request('ledger_id'))->delete();
-      return response()->json(['error' => 'Unable to delete ledger.'], Response::HTTP_BAD_REQUEST);
+      LedgerPayments::where('ledger_id', request('ledger_id'))->delete();  
+      DB::commit();
+    } catch (\Exception $e) {
+      Log::error($e);
+      DB::rollback();
+      return response()->json(['success' => false, 'error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
     }
     return response()->json(['success' => true]);
   }
 
   public function viewPdf()
   {
-    // $user = $this->getUser(request());
-    // if(!$user){
-    //   return response()->json(['error'=>'Please Login'], Response::HTTP_BAD_REQUEST);
-    // }
+    $user = $this->getUser(request());
+    if(!$user){
+      return response()->json(['error'=>'Please Login'], Response::HTTP_BAD_REQUEST);
+    }
 
     $ledger = Ledger::where('id', request('ledger_id'))->where('shop_id', request('shop_id'))->get()->first();
     if (!$ledger) {
@@ -229,6 +234,26 @@ class LedgerController extends Controller
     }
     $pdf = App::make('dompdf.wrapper');
     $pdf->loadHTML(view('pdf.receipt', ['shop' => $shop, 'entry' => $ledger, 'products' => $ledger->products]));
+    return $pdf->stream();
+  }
+
+  public function viewInvoice()
+  {
+    $user = $this->getUser(request());
+    if(!$user){
+      return response()->json(['error'=>'Please Login'], Response::HTTP_BAD_REQUEST);
+    }
+
+    $ledger = Ledger::where('id', request('ledger_id'))->where('shop_id', request('shop_id'))->get()->first();
+    if (!$ledger) {
+      return response()->json(['error' => 'Unable to find ledger.'], Response::HTTP_BAD_REQUEST);
+    }
+    $shop = Shops::where('id', request('shop_id'))->get()->first();
+    if (request('html')) {
+      return view('pdf.invoice', ['shop' => $shop, 'entry' => $ledger, 'products' => $ledger->products]);
+    }
+    $pdf = App::make('dompdf.wrapper');
+    $pdf->loadHTML(view('pdf.invoice', ['shop' => $shop, 'entry' => $ledger, 'products' => $ledger->products]));
     return $pdf->stream();
   }
 
@@ -255,9 +280,9 @@ class LedgerController extends Controller
     if (isset($_GET['customer']) && !empty($_GET['customer']) && (isset($_GET['customerId']) && !empty($_GET['customerId']))) {
       $ledgers->where("customer_id", $_GET['customerId']);
     }
-    if (isset($_GET['paymentStatus']) && !empty($_GET['paymentStatus'])) {
-      $ledgers->where("payment_status", $_GET['paymentStatus']);
-    }
+    // if (isset($_GET['paymentStatus']) && !empty($_GET['paymentStatus'])) {
+    //   $ledgers->where("payment_status", $_GET['paymentStatus']);
+    // }
     $ledgers = $ledgers->orderBy('created_at', 'desc')->get();
     if (isset($_GET['print']) && $_GET['print'] == 'false') {
       return response()->json(['entries' => $ledgers]);
