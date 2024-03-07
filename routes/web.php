@@ -17,6 +17,10 @@ use App\Http\Middleware\Authentication;
 
 Route::post('/signup', 'AuthenticationController@signup');
 Route::post('/login', 'AuthenticationController@login');
+
+Route::post('/webhooks/shop/{shop_id}/wordpress/ledger/new', 'LedgerController@wordpress_webhook_new');
+Route::any('/webhooks/shop/{shop_id}/wordpress/ledger/update', 'LedgerController@wordpress_webhook_update');
+
 // Route::get('/admin_script/ledger/move_existing_receiving_in_new', 'LedgerController@move_existing_receiving_in_new');
 
 // Route::group([Authentication::class], function()
@@ -67,5 +71,9 @@ Route::post('/login', 'AuthenticationController@login');
   Route::get('/shops/{shop_id}/receiving/{receiving_id}', 'ReceivingsController@view');
   Route::post('/shops/{shop_id}/receiving/{receiving_id}', 'ReceivingsController@update');
   Route::delete('/shops/{shop_id}/receiving/{receiving_id}', 'ReceivingsController@delete');
+
+  Route::get('/shops/{shop_id}/webhooks', 'ShopWebhooksController@index');
+  Route::post('/shops/{shop_id}/webhooks', 'ShopWebhooksController@create');
+  Route::delete('/shops/{shop_id}/webhooks/{webhook_id}', 'ShopWebhooksController@delete');
 
 // });

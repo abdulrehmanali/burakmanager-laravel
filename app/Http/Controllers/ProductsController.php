@@ -186,7 +186,7 @@ class ProductsController extends Controller
         $quantity = 0;
         $measurement_unit = '';
         foreach ($productionProducts_product->product->batches as $value) {
-          $quantity += $value->quantity;
+          $quantity += (int)$value->quantity;
           $measurement_unit = $value->measurement_unit;
         }
         $productionProducts[] = [

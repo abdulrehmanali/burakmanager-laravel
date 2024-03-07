@@ -64,13 +64,13 @@ class LedgerController extends Controller
       $ledger->created_at = date('Y-m-d H:i:s');
       $ledger->note = request('note');
       $ledger->save();
-
+      $ledger_id = $ledger->id;
       if (request('payments')) {
         $payments = $validated->validated()['payments'];
         foreach ($payments as $key => $payment) {
           $ledgerPayments = new LedgerPayments();
           $ledgerPayments->shop_id = request('shop_id');
-          $ledgerPayments->ledger_id = $ledger->id;
+          $ledgerPayments->ledger_id =$ledger_id;
           $ledgerPayments->method = $payment['method'];
           $ledgerPayments->status = $payment['status'];
           $ledgerPayments->amount = $payment['amount'];
@@ -82,10 +82,10 @@ class LedgerController extends Controller
       }
       if (request('products')) {
         $products = $validated->validated()['products'];
-        foreach ($products as $key => $product) {
-          $products[$key]['ledger_id'] = $ledger->id;
+        for ($i=0; $i < count($products); $i++) { 
+          $products[$i]['ledger_id'] = $ledger_id;
         }
-        LedgerProducts::insert($products);
+        LedgerProducts::create($products);
         foreach ($products as $key => $product) {
           if (isset($product['product_id']) && isset($product['batch_id'])) {
             ProductsBatches::where('product_id', $product['product_id'])->where('id', $product['batch_id'])->decrement('quantity', $product['quantity']);
@@ -94,7 +94,7 @@ class LedgerController extends Controller
       }
       DB::commit();
       $response['success'] = true;
-      $response['id'] = $ledger->id;
+      $response['id'] = $ledger_id;
     } catch (\Exception $e) {
       Log::error($e);
       $response['message'] = $e->getMessage();
@@ -319,5 +319,281 @@ class LedgerController extends Controller
   public function delete_receiving() {
     LedgerPayments::where('id', request('receiving_id'))->where('ledger_id', request('ledger_id'))->where('shop_id', request('shop_id'))->delete();
     return response()->json(['success' => true]);
+  }
+
+  public function wordpress_webhook_new() {
+    Log::error(request());
+    $response = [
+      'success' => false
+    ];
+    $old_entry = Ledger::where([
+      'shop_id' => request('shop_id'),
+      'remote_order_id' => request('id')
+    ])->get()->first();
+    if ($old_entry) {
+      $response['message'] = 'Order #'.request('id').' Already Exist';
+      return response()->json($response);
+    }
+    try {
+      DB::beginTransaction();
+      $ledger = new Ledger();
+      $ledger->shop_id = request('shop_id');
+      $ledger->type = 'credit';
+      $ledger->customer_name = request('billing')['first_name'] . ' '. request('billing')['last_name'];
+      $ledger->customer_id = 0;
+      $ledger->total = request('total');
+      $ledger->created_at = date('Y-m-d H:i:s');
+      $ledger->note = request('note');
+      $ledger->save();
+      $ledger_id = $ledger->id;
+
+
+      // if ($payments = request('payments')) {
+      //   foreach ($payments as $key => $payment) {
+
+      //   }
+      // }
+
+      $ledgerPayments = new LedgerPayments();
+      $ledgerPayments->shop_id = request('shop_id');
+      $ledgerPayments->ledger_id = $ledger_id;
+      $ledgerPayments->method = request('payment_method')?request('payment_method'):'N/A';
+      $ledgerPayments->status = request('date_completed') != null ? 'received' : 'pending';
+      $ledgerPayments->amount = request('total');
+      $ledgerPayments->bank_name = request('payment_method_title');
+      $ledgerPayments->transaction_id = request('transaction_id');
+      $ledgerPayments->save();
+
+      if ($products = request('line_items')) {
+        foreach ($products as $key => $product) {
+          $total_quantity = $product['quantity'];
+          $sku = $product['sku'];
+          $product_name = $product['name'];
+          $total_price = $product['total'];
+
+          $system_product = Products::where([
+            'sku' => $sku,
+            'shop_id' => request('shop_id')
+          ])->get()->first();
+          
+          if ($system_product) {
+            $reduce_quantity_from_batches = [];
+            $batches = $system_product->batches();
+            if ($batches->count()) {
+              $quantity_after_deduct = $total_quantity;
+              foreach ($batches->get() as $batch) {
+                if ($batch->quantity >= $quantity_after_deduct) {
+                  $reduce_quantity_from_batches[] = [
+                    'batch_id' => $batch->id,
+                    'quantity' => $total_quantity
+                  ];
+                  $quantity_after_deduct -= $quantity_after_deduct;
+                }
+
+                if ($quantity_after_deduct > 0 && $batch->quantity < $quantity_after_deduct) {
+                  $reduce_quantity_from_batches[] = [
+                    'batch_id' => $batch->id,
+                    'quantity' => $total_quantity
+                  ];
+                  $quantity_after_deduct -= $batch->quantity;
+                }
+              }
+
+              if ($quantity_after_deduct > 0) {
+                $last_batch = $batches->orderBy('id', 'desc')->first();
+                $reduce_quantity_from_batches[] = [
+                  'batch_id' => $last_batch->id,
+                  'quantity' => $total_quantity,
+                ];
+              }
+
+              foreach ($reduce_quantity_from_batches as $reduce_quantity_from_batch) {
+                $batches->where('id', $reduce_quantity_from_batch['batch_id'])->decrement('quantity', $reduce_quantity_from_batch['quantity']);
+              }
+            }
+            if ($reduce_quantity_from_batches && count($reduce_quantity_from_batches)) {
+              foreach ($reduce_quantity_from_batches as $reduce_quantity_from_batch) {
+                LedgerProducts::create([
+                  'ledger_id' => $ledger_id,
+                  'product_id' => $system_product->id,
+                  'batch_id' => $reduce_quantity_from_batch['batch_id'],
+                  'quantity' => $reduce_quantity_from_batch['quantity'],
+                  'rate' => $total_price,
+                  'product_name' => ($product_name ? $product_name : 'N/A')
+                ]);
+              }
+            } else {
+              LedgerProducts::create([
+                'ledger_id' => $ledger_id,
+                'product_id' => $system_product->id,
+                'quantity' => $total_quantity,
+                'rate' => $total_price,
+                'product_name' => ($product_name ? $product_name : 'N/A')
+              ]);
+            }
+          } else {
+            LedgerProducts::create([
+              'ledger_id' => $ledger_id,
+              'quantity' => $total_quantity,
+              'rate' => $total_price,
+              'product_name' => ($product_name ? $product_name : 'N/A')
+            ]);
+          }
+        }
+      }
+
+      if ($shipping_lines = request('shipping_lines')) {
+        foreach ($shipping_lines as $shipping_line) {
+          LedgerProducts::create([
+            'ledger_id' => $ledger_id,
+            'quantity' => 1,
+            'rate' => $shipping_line['total'],
+            'product_name' => $shipping_line['method_title']
+          ]);
+        }
+      }
+      DB::commit();
+      $response['success'] = true;
+      $response['id'] = $ledger->id;
+    } catch (\Exception $e) {
+      Log::error($e);
+      $response['message'] = $e->getMessage();
+      DB::rollback();
+    }
+    return response()->json($response);
+  }
+
+  public function wordpress_webhook_update() {
+    Log::error(request());
+    $response = [
+      'success' => false
+    ];
+    try {
+      DB::beginTransaction();
+      $ledger = new Ledger();
+      $ledger->shop_id = request('shop_id');
+      $ledger->type = 'credit';
+      $ledger->customer_name = request('billing')['first_name'] + ' '+ request('billing')['last_name'];
+      $ledger->customer_id = 0;
+      $ledger->total = request('total');
+      $ledger->created_at = date('Y-m-d H:i:s');
+      $ledger->note = request('note');
+      $ledger->save();
+      $ledger_id = $ledger->id;
+
+
+      // if ($payments = request('payments')) {
+      //   foreach ($payments as $key => $payment) {
+
+      //   }
+      // }
+
+      $ledgerPayments = new LedgerPayments();
+      $ledgerPayments->shop_id = request('shop_id');
+      $ledgerPayments->ledger_id = $ledger_id;
+      $ledgerPayments->method = request('payment_method');
+      $ledgerPayments->status = request('date_completed') != null ? 'received' : 'pending';
+      $ledgerPayments->amount = request('total');
+      $ledgerPayments->bank_name = request('payment_method_title');
+      $ledgerPayments->transaction_id = request('transaction_id');
+      $ledgerPayments->save();
+
+      if ($products = request('line_items')) {
+        foreach ($products as $key => $product) {
+          $total_quantity = $product['quantity'];
+          $sku = $product['sku'];
+          $product_name = $product['name'];
+          $total_price = $product['total'];
+
+          $system_product = Products::where([
+            'sku' => $sku,
+            'shop_id' => request('shop_id')
+          ])->get()->first();
+          
+          if ($system_product) {
+            $reduce_quantity_from_batches = [];
+            $batches = $system_product->batches();
+            if ($batches->count()) {
+              $quantity_after_deduct = $total_quantity;
+              foreach ($batches->get() as $batch) {
+                if ($batch->quantity >= $quantity_after_deduct) {
+                  $reduce_quantity_from_batches[] = [
+                    'batch_id' => $batch->id,
+                    'quantity' => $total_quantity
+                  ];
+                  $quantity_after_deduct -= $quantity_after_deduct;
+                }
+
+                if ($quantity_after_deduct > 0 && $batch->quantity < $quantity_after_deduct) {
+                  $reduce_quantity_from_batches[] = [
+                    'batch_id' => $batch->id,
+                    'quantity' => $total_quantity
+                  ];
+                  $quantity_after_deduct -= $batch->quantity;
+                }
+              }
+
+              if ($quantity_after_deduct > 0) {
+                $last_batch = $batches->orderBy('id', 'desc')->first();
+                $reduce_quantity_from_batches[] = [
+                  'batch_id' => $last_batch->id,
+                  'quantity' => $total_quantity,
+                ];
+              }
+
+              foreach ($reduce_quantity_from_batches as $reduce_quantity_from_batch) {
+                $batches->where('id', $reduce_quantity_from_batch['batch_id'])->decrement('quantity', $reduce_quantity_from_batch['quantity']);
+              }
+            }
+            if ($reduce_quantity_from_batches && count($reduce_quantity_from_batches)) {
+              foreach ($reduce_quantity_from_batches as $reduce_quantity_from_batch) {
+                LedgerProducts::create([
+                  'ledger_id' => $ledger_id,
+                  'product_id' => $system_product->id,
+                  'batch_id' => $reduce_quantity_from_batch['batch_id'],
+                  'quantity' => $reduce_quantity_from_batch['quantity'],
+                  'rate' => $total_price,
+                  'product_name' => $product_name
+                ]);
+              }
+            } else {
+              LedgerProducts::create([
+                'ledger_id' => $ledger_id,
+                'product_id' => $system_product->id,
+                'quantity' => $total_quantity,
+                'rate' => $total_price,
+                'product_name' => $product_name
+              ]);
+            }
+          } else {
+            LedgerProducts::create([
+              'ledger_id' => $ledger_id,
+              'quantity' => $total_quantity,
+              'rate' => $total_price,
+              'product_name' => $product_name
+            ]);
+          }
+        }
+      }
+
+      if ($shipping_lines = request('shipping_lines')) {
+        foreach ($shipping_lines as $shipping_line) {
+          LedgerProducts::create([
+            'ledger_id' => $ledger_id,
+            'quantity' => 1,
+            'rate' => $shipping_line['total'],
+            'product_name' => $shipping_line['method_title']
+          ]);
+        }
+      }
+      DB::commit();
+      $response['success'] = true;
+      $response['id'] = $ledger->id;
+    } catch (\Exception $e) {
+      Log::error($e);
+      $response['message'] = $e->getMessage();
+      DB::rollback();
+    }
+
   }
 }
