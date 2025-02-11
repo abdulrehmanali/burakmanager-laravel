@@ -209,10 +209,24 @@ class ProductsController extends Controller
       return response()->json(['error' => 'Please Login'], Response::HTTP_BAD_REQUEST);
     }
     $products = Products::where("shop_id", request("shop_id"));
+    $search = request('search');
     if (request('search')) {
-      $products = $products->where(function ($query) {
-        $query->where('name', 'like', "%" . request('search') . "%")->orWhere('sku', 'like', "%" . request('search') . "%");
-      });
+      $searchField = request('searchField');
+      if ($searchField == "quantity") {
+        $products = $products->leftJoin('products_batches', 'products.id', '=', 'products_batches.product_id');
+        $products = $products->groupBy('products_batches');
+        $products = $products->whereRaw('SUM(products_batches.quantity) = ?', [$search]);
+
+        $productsWithBatchCount = DB::table('products')
+        ->leftJoin('product_batches', 'products.id', '=', 'product_batches.product_id')
+        ->select('products.id', 'products.name', DB::raw('COUNT(product_batches.id) as batch_count'))
+        ->groupBy('products.id', 'products.name')
+        ->get();
+      }
+
+      // $products = $products->where(function ($query) {
+      //   $query->where('name', 'like', "%" . request('search') . "%")->orWhere('sku', 'like', "%" . request('search') . "%");
+      // });
     }
     $products = $products->get();
     foreach ($products as $key => $value) {

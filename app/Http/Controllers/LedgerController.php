@@ -82,10 +82,10 @@ class LedgerController extends Controller
       }
       if (request('products')) {
         $products = $validated->validated()['products'];
-        for ($i=0; $i < count($products); $i++) { 
-          $products[$i]['ledger_id'] = $ledger_id;
+        foreach ($products as $key => $product) {
+          $product['ledger_id'] = $ledger_id;
+          LedgerProducts::create($product);
         }
-        LedgerProducts::create($products);
         foreach ($products as $key => $product) {
           if (isset($product['product_id']) && isset($product['batch_id'])) {
             ProductsBatches::where('product_id', $product['product_id'])->where('id', $product['batch_id'])->decrement('quantity', $product['quantity']);
@@ -322,18 +322,23 @@ class LedgerController extends Controller
   }
 
   public function wordpress_webhook_new() {
-    Log::error(request());
     $response = [
       'success' => false
     ];
+    Log::error(json_encode(request('fee_lines')));
+    Log::error(json_encode(request('line_items')));
+    Log::error(json_encode(request('shipping_lines')));
+
     $old_entry = Ledger::where([
       'shop_id' => request('shop_id'),
       'remote_order_id' => request('id')
     ])->get()->first();
+  
     if ($old_entry) {
       $response['message'] = 'Order #'.request('id').' Already Exist';
       return response()->json($response);
     }
+
     try {
       DB::beginTransaction();
       $ledger = new Ledger();
@@ -344,6 +349,7 @@ class LedgerController extends Controller
       $ledger->total = request('total');
       $ledger->created_at = date('Y-m-d H:i:s');
       $ledger->note = request('note');
+      $ledger->remote_order_id = request('id');
       $ledger->save();
       $ledger_id = $ledger->id;
 
@@ -382,33 +388,57 @@ class LedgerController extends Controller
             if ($batches->count()) {
               $quantity_after_deduct = $total_quantity;
               foreach ($batches->get() as $batch) {
-                if ($batch->quantity >= $quantity_after_deduct) {
-                  $reduce_quantity_from_batches[] = [
-                    'batch_id' => $batch->id,
-                    'quantity' => $total_quantity
-                  ];
-                  $quantity_after_deduct -= $quantity_after_deduct;
+                if ($batch->quantity <= 0) {
+                  continue;
                 }
+                Log::error('quantity_after_deduct > '.$quantity_after_deduct);
+                Log::error('batch->quantity > '.$batch->quantity);
 
-                if ($quantity_after_deduct > 0 && $batch->quantity < $quantity_after_deduct) {
+                if ($quantity_after_deduct >= $batch->quantity) {
+                  $new_quantity_after_deduct = $quantity_after_deduct - $batch->quantity;
                   $reduce_quantity_from_batches[] = [
                     'batch_id' => $batch->id,
-                    'quantity' => $total_quantity
+                    'quantity' => $batch->quantity
                   ];
-                  $quantity_after_deduct -= $batch->quantity;
+                  $quantity_after_deduct = $new_quantity_after_deduct;
+                } else {
+                  $new_quantity_after_deduct = $batch->quantity - $quantity_after_deduct;
+                  $reduce_quantity_from_batches[] = [
+                    'batch_id' => $batch->id,
+                    'quantity' => $quantity_after_deduct
+                  ];
+                  $quantity_after_deduct = 0;
                 }
+                Log::error($quantity_after_deduct);
+
+                // if ($batch->quantity >= $quantity_after_deduct) {
+                //   $quantity_after_deduct -= $batch->quantity;
+                //   $reduce_quantity_from_batches[] = [
+                //     'batch_id' => $batch->id,
+                //     'quantity' => $batch->quantity
+                //   ];
+                // }
+
+                // if ($quantity_after_deduct > 0 && $batch->quantity < $quantity_after_deduct) {
+                //   $quantity_after_deduct =  $quantity_after_deduct - $batch->quantity;
+                //   $reduce_quantity_from_batches[] = [
+                //     'batch_id' => $batch->id,
+                //     'quantity' => $batch->quantity
+                //   ];
+                // }
               }
 
               if ($quantity_after_deduct > 0) {
                 $last_batch = $batches->orderBy('id', 'desc')->first();
                 $reduce_quantity_from_batches[] = [
                   'batch_id' => $last_batch->id,
-                  'quantity' => $total_quantity,
+                  'quantity' => $quantity_after_deduct,
                 ];
               }
+              Log::error(json_encode($reduce_quantity_from_batches));
 
               foreach ($reduce_quantity_from_batches as $reduce_quantity_from_batch) {
-                $batches->where('id', $reduce_quantity_from_batch['batch_id'])->decrement('quantity', $reduce_quantity_from_batch['quantity']);
+                ProductsBatches::where('id', $reduce_quantity_from_batch['batch_id'])->decrement('quantity', $reduce_quantity_from_batch['quantity']);
               }
             }
             if ($reduce_quantity_from_batches && count($reduce_quantity_from_batches)) {
@@ -448,10 +478,22 @@ class LedgerController extends Controller
             'ledger_id' => $ledger_id,
             'quantity' => 1,
             'rate' => $shipping_line['total'],
-            'product_name' => $shipping_line['method_title']
+            'product_name' => $shipping_line['name']
           ]);
         }
       }
+      $fees = request('fee_lines');
+      if ($fees && $fees != null) {
+        foreach ($fees as $fee) {
+          LedgerProducts::create([
+            'ledger_id' => $ledger_id,
+            'quantity' => 1,
+            'rate' => $fee['total'],
+            'product_name' => $fee['name']
+          ]);
+        }
+      }
+
       DB::commit();
       $response['success'] = true;
       $response['id'] = $ledger->id;
@@ -464,12 +506,12 @@ class LedgerController extends Controller
   }
 
   public function wordpress_webhook_update() {
-    Log::error(request());
     $response = [
       'success' => false
     ];
     try {
       DB::beginTransaction();
+      Log::error(print_r(request()));
       $ledger = new Ledger();
       $ledger->shop_id = request('shop_id');
       $ledger->type = 'credit';
@@ -588,7 +630,7 @@ class LedgerController extends Controller
       }
       DB::commit();
       $response['success'] = true;
-      $response['id'] = $ledger->id;
+      $response['id'] = $ledger_id;
     } catch (\Exception $e) {
       Log::error($e);
       $response['message'] = $e->getMessage();
